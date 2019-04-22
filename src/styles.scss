@@ -1,0 +1,78 @@
+body {
+  user-select: none;
+  font-family: "Open Sans", sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.app-container {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  flex-grow: 0;
+  flex-shrink: 0;
+  background: #f5f8fa;
+  padding: 10px;
+  border-bottom: 1px solid #e1e8ed;
+}
+
+.app-main {
+  flex: 1 1;
+  overflow-y: scroll;
+  padding: 10px;
+}
+
+.dashboard {
+  &-section-header {
+    border-bottom: 1px solid #e1e8ed;
+    padding: 5px;
+    margin-bottom: 5px;
+    .el-caption {
+      font-size: 1.2em;
+      font-weight: bold;
+      margin-right: 10px;
+    }
+  }
+
+  &-timeline {
+    &-header {
+      .el-right {
+        float: right;
+      }
+      background: #f5f8fa;
+      padding: 5px;
+    }
+  }
+}
+
+.group-editor {
+  display: inline-block;
+  vertical-align: top;
+
+  &-group {
+    $height: 27px;
+    display: inline-block;
+    line-height: $height;
+    .el-color {
+      display: inline-block;
+      height: $height;
+      width: $height;
+      vertical-align: top;
+      margin: 0 5px;
+      border: 1px solid black;
+      box-sizing: border-box;
+    }
+    .el-filter {
+      display: inline-block;
+      line-height: $height;
+    }
+  }
+}

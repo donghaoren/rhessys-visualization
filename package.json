@@ -1,0 +1,43 @@
+{
+  "name": "rhessys-visualizations",
+  "private": true,
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "keywords": [],
+  "author": "Donghao Ren",
+  "license": "MIT",
+  "scripts": {
+    "clean": "rm dist/bundle.js",
+    "start": "parcel src/index.html",
+    "prettify": "prettier --write \"src/**/*.{js,jsx,ts,tsx,html,scss}\" package.json",
+    "lint": "tslint \"src/**/*.{ts,tsx}\"",
+    "build-prod": "parcel build src/index.html --public-url ./"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.4.0",
+    "@babel/polyfill": "^7.4.3",
+    "@babel/preset-env": "^7.4.2",
+    "@babel/preset-react": "^7.0.0",
+    "@blueprintjs/core": "^3.15.1",
+    "@blueprintjs/icons": "^3.8.0",
+    "@blueprintjs/select": "^3.8.0",
+    "@mapd/connector": "^4.4.0",
+    "@types/d3": "^5.7.2",
+    "@types/react": "^16.8.13",
+    "@types/react-dom": "^16.8.4",
+    "d3": "^5.9.2",
+    "normalize.css": "^8.0.1",
+    "parcel-bundler": "^1.12.3",
+    "prettier": "^1.17.0",
+    "react": "^16.8.6",
+    "react-dom": "^16.8.6",
+    "sass": "^1.19.0",
+    "typescript": "^3.4.4"
+  },
+  "dependencies": {
+    "tslint": "^5.16.0",
+    "tslint-config-prettier": "^1.18.0",
+    "tslint-react": "^4.0.0"
+  }
+}

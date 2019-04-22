@@ -1,0 +1,86 @@
+name,type,description,unit
+LE_canopy,number,Latent heat evaporated by canopy,
+LE_soil,number,La,
+Ldown,number,Downward (from atmosphere) Longwave Radiation_,
+Lstar_can,number,Absorbed longwave by canopy,
+Lstar_snow,number,Absorbed longwave by snow,
+Lstar_soil,number,Absorbed longwave by soil,
+Lup,number,Reflected (upward) Longwave Radiation_,
+N_dep,number,Nitrogen Deposition,
+baseflow,number,Baseflow,mm
+canopy_snow,number,Snow Intercepted on Canopy,
+canopy_store,number,Canopy Intercepted water Store,m2/m2
+canopysubl,number,Canopy Sublimation,
+cap,number,Capillary Rise,mm
+cpool,number,Carbon Pool,
+denitrif,number,Denitrification,gN/m2/day
+detention_store,number,Detention Store,mm
+et,number,Evapotranspiration,mm/m2
+evap,number,Evaporation,mm
+evap_can,number,Canopy Evaporation?,
+evap_lit,number,Litter Evaporation_,
+evap_soil,number,Soil Evaporation_,
+fertilizer_store,number,Fertilizer N in ?,
+gpsn,number,Gross Photosynthesis,kgC/m2
+grazingC,number,Carbon lost by grazing,
+gs,number,Canopy Conductance,mm/s?
+gwDOC,number,Groundwater Dissolved Organic Carbon,
+gwDOCout,number,Groundwater Dissolved Organic Carbon Loss,
+gwDON,number,Groundwater Dissolved Organic Nitrogen,
+gwDONout,number,Groundwater Dissolved Organic Nitrogen Loss,
+gwNH4,number,Groundwater Ammonium Store,mm
+gwNH4out,number,Groundwater Ammonium Export,
+gwNO3,number,Groundwater Nitrate Store,mm
+gwNO3out,number,Groundwater Nitrate Export,
+gw_Qout,number,Groundwater Output,mm
+gw_storage,number,Groundwater Store,mm
+height,number,Canopy height,
+lai,number,Leaf Area Index,m2/m2
+litrc,number,Litter Carbon_,
+litrn,number,Litter Nitrogen,kgN/m2
+litter_store,number,Litter intercepted water Store,m2/m2
+mortf,number,Fraction of Basin that have tree mortality,
+nfix,number,Nitrogen Fixation,
+nitrate,number,Nitrate,gN/m2
+nitrif,number,Nitrification,gN/m2/day
+npool,number,Nitrogen Pool,
+nuptake,number,Nitrogen Uptake,
+pet,number,Potential Evapotranspiration,mm
+plant_resp,number,Plant Maintenance Respiration,mC/m2
+plantc,number,Plant Carbon,kgC/m2
+plantn,number,Plant Nitrogen,
+pot_surface_infil,number,Rain Throughfall,mm
+precip,number,Precipitation,mm
+psn,number,Net Photosynthesis,kgC/m2
+recharge,number,_Recharge of water to soil,
+resp,number,_ Respiration_,kgC/m2
+return,number,Return flow,mm
+root_depth,number,Root Depth,
+rootdepth,number,Rooting depth,
+rz_drainage,number,Rooting Zone Drainage,mm
+rz_storage,number,Rooting Zone Storage,mm of water
+sat_def,number,Saturation Deficit - volume,mm of water
+sat_def_z,number,Saturation Deficit with depth,mm of depth
+sminn,number,Mineralized Nitrate,gN/m2
+snow_subl,number,Snow Sublimation,
+snow_thr,number,Snow Throughfall,mm
+snowfall,number,Snowfall,
+snowmelt,number,Snow Melt,
+snowpack,number,Snow Water Equivalent (SWE),mm
+soil_resp,number,Soil Respiration,gC/m2/day
+soilc,number,Soil Carbon,kgC/m2
+soiln,number,Soil Nitrogen,kgN/m2
+streamflow,number,Total Stream Outflow,mm (normalized by basin area)
+streamflow_DOC,number,Streamflow Dissolved Organic Carbon,
+streamflow_DON,number,Streamflow Dissolved Organic Nitrogen,
+streamflow_NH4,number,Streamflow Ammonium,gN/m2/day
+streamflow_NO3,number,Streamflow Nitrate,gN/m2/day
+surfaceN,number,Surface Nitrate_,gN/m2
+tavg,number,Average Temperature,C
+tmax,number,Maximum Temperature,C
+tmin,number,Minimum Temperature,C
+trans,number,Transpiration,mm
+trans_var,number,Spatial variation in transpiration,
+unsat_drain,number,Unsaturated Storage,mm
+unsat_stor,number,Unsaturated Storage,mm
+vpd,number,Vapor Pressure Deficit,Pa
