@@ -40,6 +40,7 @@ export class TimeseriesPlot extends React.PureComponent<TimeseriesPlotProps> {
   public chunkCache = new Map<
     string,
     {
+      id: string;
       timeStart: number;
       timeEnd: number;
       data: Float64Array[][];
@@ -79,6 +80,7 @@ export class TimeseriesPlot extends React.PureComponent<TimeseriesPlotProps> {
       new Float64Array(data[i].map(t => t[x.variable]))
     ]);
     this.chunkCache.set(timeStart + "::" + timeEnd, {
+      id: timeStart + "::" + timeEnd,
       timeStart,
       timeEnd,
       data: arrays
@@ -180,9 +182,9 @@ export class TimeseriesPlot extends React.PureComponent<TimeseriesPlotProps> {
         <g clipPath={`url(#${this.clipPathID})`}>
           {this.props.lines.map((line, index) => (
             <g key={index} transform={`translate(${tScale(0).toFixed(5)}, 0)`}>
-              {chunks.map((chunk, chunkIndex) => (
+              {chunks.map(chunk => (
                 <TimeseriesChunk
-                  key={chunkIndex}
+                  key={chunk.id}
                   stroke={line.color}
                   lineWidth={line.lineWidth}
                   opacity={line.opacity}

@@ -9,6 +9,7 @@ export interface D3AxisProps {
   grid?: boolean;
   width?: number;
   orient: "left" | "bottom" | "top" | "right";
+  rotateLabels?: number;
 }
 
 export class D3Axis extends React.Component<D3AxisProps> {
@@ -35,6 +36,14 @@ export class D3Axis extends React.Component<D3AxisProps> {
         ? d3.axisRight(scale)
         : null;
     d3.select(this.container).call(axis);
+    if (this.props.rotateLabels != null) {
+      d3.select(this.container)
+        .selectAll("text")
+        .style("text-anchor", "end")
+        .attr("dx", "-.8em")
+        .attr("dy", ".15em")
+        .attr("transform", `rotate(-${this.props.rotateLabels})`);
+    }
     if (this.props.grid) {
       axis.tickFormat(() => "");
       axis.tickSize(-this.props.width);
