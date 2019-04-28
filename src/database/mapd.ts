@@ -4,7 +4,9 @@ import {
   RHESSysDatabase,
   RHESSysDataFilter,
   RHESSysVariable,
-  RHESSysGranularity
+  RHESSysDataGroups,
+  RHESSysGranularity,
+  RHESSysStats
 } from "./abstract";
 import {
   timestamp_to_days,
@@ -26,32 +28,126 @@ export interface MapDConnectionOptions {
   password: string;
 }
 
-declare let require: any;
-
 export class MapDConnection implements RHESSysDatabase {
-  public async queryScatterplot(
+  public async queryVariables(
     table: string,
     granularity: RHESSysGranularity,
-    variable1: string,
-    variable2: string,
+    variables: string[],
+    groups?: RHESSysDataGroups,
     filter?: RHESSysDataFilter
-  ): Promise<Array<{ ts: number; x: number; y: number }>> {
-    const variableExpression = (v: string) => {
-      return `AVG(m_${v}) as ${v}`;
-    };
+  ): Promise<Array<Array<{ [name: string]: any; t: number }>>> {
+    let selectVariables = [
+      `t_${granularity} as t`,
+      ...variables.map(v => `AVG(m_${v}) as m_${v}`)
+    ];
+    if (groups) {
+      selectVariables = selectVariables.concat(
+        groups.variables.map(v => `m_${v} as g_${v}`)
+      );
+    }
     const { results } = await this.query(`
       SELECT
-        t_${granularity} as t,
-        ${variableExpression(variable1)},
-        ${variableExpression(variable2)}
-      FROM ${table}
+        ${selectVariables.join(",")}
+      FROM
+        ${table}
       ${this.filterExpression(granularity, filter)}
-      ${this.groupExpression(granularity)}
+      GROUP BY
+        t_${granularity}
+        ${
+          groups && groups.variables.length > 0
+            ? "," + groups.variables.map(v => `m_${v}`)
+            : ""
+        }
+      ORDER BY t_${granularity}
     `);
     for (const item of results) {
       item.t = this.group_to_timestamp(item.t, granularity);
+      for (const v of variables) {
+        item[v] = item["m_" + v];
+      }
     }
-    return results;
+    if (groups) {
+      return groups.groups.map(g =>
+        results.filter(item =>
+          groups.variables.every((v, i) => item["g_" + v] == g[i])
+        )
+      );
+    } else {
+      return [results];
+    }
+  }
+
+  public async queryAggregatedVariables(
+    table: string,
+    variables: string[],
+    aggregation: RHESSysGranularity,
+    groups?: RHESSysDataGroups,
+    filter?: RHESSysDataFilter
+  ): Promise<
+    Array<
+      Array<{
+        t: number;
+        variables: {
+          [name: string]: RHESSysStats;
+        };
+      }>
+    >
+  > {
+    const variableExpressions = (v: string) => {
+      return [
+        `AVG(m_${v}) as mean_${v}`,
+        `VARIANCE(m_${v}) as var_${v}`,
+        `MIN(m_${v}) as min_${v}`,
+        `MAX(m_${v}) as max_${v}`,
+        `COUNT(m_${v}) as count_${v}`
+      ];
+    };
+    let selectVariables = [`ty_${aggregation} as t`];
+    for (const variable of variables) {
+      selectVariables = selectVariables.concat(variableExpressions(variable));
+    }
+    if (groups) {
+      selectVariables = selectVariables.concat(
+        groups.variables.map(v => `m_${v} as ${v}`)
+      );
+    }
+    const { results } = await this.query(`
+      SELECT
+        ${selectVariables.join(",")}
+      FROM
+        ${table}
+      ${this.filterExpression("day", filter)}
+      GROUP BY
+        ty_${aggregation}
+        ${
+          groups && groups.variables.length > 0
+            ? "," + groups.variables.map(v => `m_${v}`)
+            : ""
+        }
+      ORDER BY ty_${aggregation}
+    `);
+    const mapResults = (item: any) => {
+      const r = { t: item.t, variables: {} as any };
+      for (const variable of variables) {
+        r.variables[variable] = {
+          min: item["min_" + variable],
+          max: item["max_" + variable],
+          mean: item["mean_" + variable],
+          stdev: Math.sqrt(item["var_" + variable]),
+          count: item["count_" + variable]
+        };
+      }
+      return r;
+    };
+    if (groups) {
+      return groups.groups.map(g =>
+        results
+          .filter(item => groups.variables.every((v, i) => item[v] == g[i]))
+          .map(mapResults)
+      );
+    } else {
+      return [results.map(mapResults)];
+    }
   }
 
   public async listTables(): Promise<string[]> {
@@ -102,29 +198,6 @@ export class MapDConnection implements RHESSysDatabase {
       .filter((x: any) => x != null);
   }
 
-  public async queryTimeSeries(
-    table: string,
-    granularity: "year" | "month" | "week" | "day",
-    variables: string[],
-    filter: RHESSysDataFilter = {}
-  ): Promise<any[]> {
-    const variableExpression = (v: string) => {
-      return `AVG(m_${v}) as ${v}`;
-    };
-    const { results } = await this.query(`
-      SELECT t_${granularity} as t, ${variables
-      .map(variableExpression)
-      .join(",")}
-      FROM ${table}
-      ${this.filterExpression(granularity, filter)}
-      ${this.groupExpression(granularity)}
-    `);
-    for (const item of results) {
-      item.t = this.group_to_timestamp(item.t, granularity);
-    }
-    return results;
-  }
-
   public async queryDistinctValues(
     table: string,
     variable: string
@@ -139,11 +212,12 @@ export class MapDConnection implements RHESSysDatabase {
     table: string,
     variable: string,
     granularity: RHESSysGranularity
-  ): Promise<{ min: number; max: number; stdev: number; mean: number }> {
+  ): Promise<RHESSysStats> {
     const { results } = await this.query(`
       SELECT
         MIN(vv) as vmin, MAX(vv) as vmax,
-        VARIANCE(vv) as vvar, AVG(vv) as vavg
+        VARIANCE(vv) as vvar, AVG(vv) as vavg,
+        COUNT(vv) as vcount
       FROM (
         SELECT
           m_${variable} as vv
@@ -154,7 +228,8 @@ export class MapDConnection implements RHESSysDatabase {
       min: results[0].vmin,
       max: results[0].vmax,
       stdev: Math.sqrt(results[0].vvar),
-      mean: results[0].vavg
+      mean: results[0].vavg,
+      count: results[0].vcount
     };
   }
 
@@ -189,38 +264,44 @@ export class MapDConnection implements RHESSysDatabase {
     filter: RHESSysDataFilter
   ) {
     const parts = [];
-    if (filter.timeStart !== undefined) {
-      parts.push(
-        `t_${granularity} >= ${this.timestamp_to_group(
-          filter.timeStart,
-          granularity
-        )}`
-      );
-    }
-    if (filter.timeEnd !== undefined) {
-      parts.push(
-        `t_${granularity} <= ${this.timestamp_to_group(
-          filter.timeEnd,
-          granularity
-        )}`
-      );
-    }
-    if (filter.attributes) {
-      for (const name of Object.keys(filter.attributes)) {
-        const item = filter.attributes[name];
-        if (item.in) {
-          parts.push(
-            "(" +
-              item.in.map(value => `m_${name} = '${value}'`).join(" OR ") +
-              ")"
-          );
-        }
-        if (item.within) {
-          if (item.within.min !== undefined) {
-            parts.push(`m_${name} >= ${item.within.min}`);
+    if (filter) {
+      if (filter.timeStart !== undefined) {
+        parts.push(
+          `t_${granularity} >= ${this.timestamp_to_group(
+            filter.timeStart,
+            granularity
+          )}`
+        );
+      }
+      if (filter.timeEnd !== undefined) {
+        parts.push(
+          `t_${granularity} <= ${this.timestamp_to_group(
+            filter.timeEnd,
+            granularity
+          )}`
+        );
+      }
+      if (filter.attributes) {
+        for (const name of Object.keys(filter.attributes)) {
+          const item = filter.attributes[name];
+          if (item.in) {
+            if (item.in.length == 0) {
+              parts.push("(FALSE)");
+            } else {
+              parts.push(
+                "(" +
+                  item.in.map(value => `m_${name} = '${value}'`).join(" OR ") +
+                  ")"
+              );
+            }
           }
-          if (item.within.max !== undefined) {
-            parts.push(`m_${name} <= ${item.within.max}`);
+          if (item.within) {
+            if (item.within.min !== undefined) {
+              parts.push(`m_${name} >= ${item.within.min}`);
+            }
+            if (item.within.max !== undefined) {
+              parts.push(`m_${name} <= ${item.within.max}`);
+            }
           }
         }
       }
@@ -230,13 +311,6 @@ export class MapDConnection implements RHESSysDatabase {
     } else {
       return "";
     }
-  }
-
-  private groupExpression(granularity: string) {
-    return `
-      GROUP BY t_${granularity}
-      ORDER BY t_${granularity}
-    `;
   }
 
   private session: any;
@@ -255,10 +329,17 @@ export class MapDConnection implements RHESSysDatabase {
   }
 
   private async query(query: string) {
-    const result = await this.session.queryAsync(query, { returnTiming: true });
-    return {
-      fields: result.fields as string[],
-      results: result.results as any[]
-    };
+    try {
+      const result = await this.session.queryAsync(query, {
+        returnTiming: true
+      });
+      return {
+        fields: result.fields as string[],
+        results: result.results as any[]
+      };
+    } catch (e) {
+      console.log("Error running query: " + query, e);
+      throw e;
+    }
   }
 }

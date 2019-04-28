@@ -1,5 +1,4 @@
 import * as React from "react";
-import * as d3 from "d3";
 import {
   RHESSysDatabase,
   RHESSysGranularity,
@@ -7,6 +6,7 @@ import {
 } from "../database/abstract";
 import { ScaleNumerical, getD3Scale } from "./scale";
 import { D3Axis } from "./axis";
+import { ChunkFetcher } from "./chunk_fetcher";
 
 export interface ScatterplotProps {
   db: RHESSysDatabase;
@@ -15,6 +15,7 @@ export interface ScatterplotProps {
   timeStart: number;
   timeEnd: number;
   granularity: RHESSysGranularity;
+  filter?: RHESSysDataFilter;
 
   width: number;
   height: number;
@@ -25,11 +26,19 @@ export interface ScatterplotProps {
   yVariable: string;
   yScale: ScaleNumerical;
 
+  points?: boolean;
+  lines?: boolean;
+
+  groupsBy: string[];
   groups: Array<{
-    filter: RHESSysDataFilter;
+    values: string[];
     color: string;
     opacity: number;
+    lineWidth: number;
+    pointSize: number;
   }>;
+
+  title?: string;
 }
 
 export interface ScatterplotState {
@@ -42,98 +51,67 @@ export class Scatterplot extends React.Component<
 > {
   public state: ScatterplotState = {};
 
-  public chunkCache = new Map<
-    string,
-    {
-      id: string;
-      timeStart: number;
-      timeEnd: number;
-      data: Float64Array[][];
-    }
-  >();
-  private chunkGeneration = 0;
-
-  public async fetchChunk(timeStart: number, timeEnd: number) {
-    if (this.chunkCache.has(timeStart + "::" + timeEnd)) {
-      return false;
-    }
-    const { xVariable, yVariable } = this.props;
-    const gen = this.chunkGeneration;
-    const data = await Promise.all(
-      this.props.groups.map(g =>
-        this.props.db.queryTimeSeries(
-          this.props.table,
-          this.props.granularity,
-          [xVariable, yVariable],
-          {
-            ...g.filter,
-            timeStart,
-            timeEnd
-          }
-        )
-      )
-    );
-    if (this.chunkGeneration != gen) {
-      return false;
-    }
-    const arrays = this.props.groups.map((x, i) => [
-      new Float64Array(data[i].map(t => t.t)),
-      new Float64Array(data[i].map(t => t[xVariable])),
-      new Float64Array(data[i].map(t => t[yVariable]))
-    ]);
-    this.chunkCache.set(timeStart + "::" + timeEnd, {
-      id: timeStart + "::" + timeEnd,
-      timeStart,
-      timeEnd,
-      data: arrays
-    });
-    return true;
-  }
-
-  public async fetchChunks() {
-    let rangeSize = 86400 * 365;
-    if (this.props.granularity == "year") {
-      rangeSize = 86400 * 365 * 2000;
-    }
-    if (this.props.granularity == "month") {
-      rangeSize = 86400 * 30 * 2000;
-    }
-    if (this.props.granularity == "week") {
-      rangeSize = 86400 * 7 * 2000;
-    }
-    if (this.props.granularity == "day") {
-      rangeSize = 86400 * 2000;
-    }
-    const range1 = Math.floor(this.props.timeStart / rangeSize);
-    const range2 = Math.ceil(this.props.timeEnd / rangeSize);
-    let shouldUpdate = false;
-    for (let i = range1; i <= range2; i++) {
-      shouldUpdate =
-        shouldUpdate ||
-        (await this.fetchChunk(i * rangeSize, i * rangeSize + rangeSize));
-    }
-    if (shouldUpdate) {
-      this.forceUpdate();
-    }
-  }
+  public chunkFetcher = new ChunkFetcher(this.props.db, this.props.table);
 
   public componentDidMount() {
-    this.fetchChunks();
+    this.chunkFetcher.addListener("update", () => {
+      this.forceUpdate();
+    });
   }
 
-  public componentDidUpdate(oldProps: ScatterplotProps) {
-    if (
-      JSON.stringify(oldProps.groups) != JSON.stringify(this.props.groups) ||
-      oldProps.granularity != this.props.granularity
-    ) {
-      this.chunkCache.clear();
-      this.chunkGeneration += 1;
-      this.forceUpdate();
-    }
-    this.fetchChunks();
+  public getCurrentViewStats() {
+    const chunks = this.chunkFetcher.getChunks(
+      this.props.timeStart,
+      this.props.timeEnd
+    );
+    return [this.props.xVariable, this.props.yVariable].map(variable => {
+      let sumX = 0;
+      let sumX2 = 0;
+      let count = 0;
+      let minX = Number.POSITIVE_INFINITY;
+      let maxX = Number.NEGATIVE_INFINITY;
+      for (const chunk of chunks) {
+        for (const item of chunk.groups) {
+          for (let i = 0; i < item.t.length; i++) {
+            const t = item.t[i];
+            if (t >= this.props.timeStart && t <= this.props.timeEnd) {
+              const value = item[variable][i];
+              if (value > maxX) {
+                maxX = value;
+              }
+              if (value < minX) {
+                minX = value;
+              }
+              sumX += value;
+              sumX2 += value * value;
+              count += 1;
+            }
+          }
+        }
+      }
+      return {
+        mean: sumX / count,
+        min: minX,
+        max: maxX,
+        stdev: Math.sqrt(sumX2 / count - (sumX / count) * (sumX / count)),
+        count
+      };
+    });
   }
 
   public render() {
+    this.chunkFetcher.setVariables([
+      this.props.xVariable,
+      this.props.yVariable
+    ]);
+    this.chunkFetcher.setFilter(this.props.filter);
+    this.chunkFetcher.setGranularity(this.props.granularity);
+    this.chunkFetcher.setGroups({
+      variables: this.props.groupsBy,
+      groups: this.props.groups.map(x => x.values)
+    });
+    this.chunkFetcher.request(this.props.timeStart, this.props.timeEnd);
+
     const { width, height } = this.props;
     const marginLeft = 80;
     const marginBottom = 80;
@@ -147,17 +125,16 @@ export class Scatterplot extends React.Component<
       height - marginBottom,
       marginTop
     ]);
-    const chunks = Array.from(this.chunkCache.values()).filter(
-      x =>
-        !(
-          x.timeStart > this.props.timeEnd || x.timeEnd < this.props.timeStart
-        ) && x.data.length == this.props.groups.length
+    const chunks = this.chunkFetcher.getChunks(
+      this.props.timeStart,
+      this.props.timeEnd
     );
     return (
       <div
         style={{
           width: this.props.width + "px",
           height: this.props.height + "px",
+          display: "inline-block",
           position: "relative"
         }}
       >
@@ -172,8 +149,24 @@ export class Scatterplot extends React.Component<
             rotateLabels={45}
             y={height - marginBottom}
             x={0}
+            title={this.props.xVariable}
+            grid={true}
+            width={height - marginTop - marginBottom}
           />
-          <D3Axis scale={yScale} orient="left" x={marginLeft} y={0} />
+          <D3Axis
+            scale={yScale}
+            orient="left"
+            x={marginLeft}
+            y={0}
+            title={this.props.yVariable}
+            grid={true}
+            width={width - marginLeft - marginRight}
+          />
+          {this.props.title ? (
+            <text x={marginLeft} y={marginTop - 5} style={{ fontSize: 12 }}>
+              {this.props.title}
+            </text>
+          ) : null}
         </svg>
         {this.props.groups.map((g, gIndex) => (
           <div key={gIndex}>
@@ -182,15 +175,31 @@ export class Scatterplot extends React.Component<
                 key={chunk.id}
                 width={this.props.width}
                 height={this.props.height}
-                chunk={chunk.data[gIndex]}
+                points={chunk.groups[gIndex]}
+                xVariable={this.props.xVariable}
+                yVariable={this.props.yVariable}
                 color={g.color}
                 opacity={g.opacity}
-                timeStart={this.props.timeStart}
-                timeEnd={this.props.timeEnd}
-                kX={xScale(1) - xScale(0)}
-                kY={yScale(1) - yScale(0)}
-                bX={xScale(0)}
-                bY={yScale(0)}
+                timeStart={Math.max(chunk.timeStart, this.props.timeStart)}
+                timeEnd={Math.min(chunk.timeEnd, this.props.timeEnd)}
+                showPoints={this.props.points}
+                showLines={this.props.lines}
+                kX={
+                  this.props.xScale.log
+                    ? xScale(Math.E) - xScale(1)
+                    : xScale(1) - xScale(0)
+                }
+                kY={
+                  this.props.yScale.log
+                    ? yScale(Math.E) - yScale(1)
+                    : yScale(1) - yScale(0)
+                }
+                bX={this.props.xScale.log ? xScale(Math.E) : xScale(0)}
+                bY={this.props.yScale.log ? yScale(Math.E) : yScale(0)}
+                xTransform={this.props.xScale.log ? "log" : "linear"}
+                yTransform={this.props.yScale.log ? "log" : "linear"}
+                lineWidth={g.lineWidth}
+                radius={g.pointSize}
               />
             ))}
           </div>
@@ -203,51 +212,23 @@ export class Scatterplot extends React.Component<
 export interface ScatterplotChunkProps {
   width: number;
   height: number;
-  chunk: Array<ArrayLike<number>>;
+  showPoints?: boolean;
+  showLines?: boolean;
+  points: { t: ArrayLike<number>; [name: string]: ArrayLike<number> };
   color: string;
   opacity: number;
   timeStart: number;
   timeEnd: number;
+  xVariable: string;
+  yVariable: string;
   kX: number;
   bX: number;
   kY: number;
   bY: number;
-}
-export class ScatterplotChunk extends React.PureComponent<
-  ScatterplotChunkProps
-> {
-  public render() {
-    const {
-      chunk,
-      color,
-      opacity,
-      timeStart,
-      timeEnd,
-      kX,
-      kY,
-      bX,
-      bY
-    } = this.props;
-    const ids: number[] = [];
-    for (let i = 0; i < chunk[0].length; i++) {
-      if (chunk[0][i] >= timeStart && chunk[0][i] <= timeEnd) {
-        ids.push(i);
-      }
-    }
-    return (
-      <g style={{ opacity }}>
-        {ids.map(id => (
-          <circle
-            key={id}
-            cx={kX * chunk[1][id] + bX}
-            cy={kY * chunk[2][id] + bY}
-            r={2}
-            style={{ fill: color }}
-          />
-        ))}
-      </g>
-    );
-  }
+  xTransform?: "linear" | "log";
+  yTransform?: "linear" | "log";
+  radius: number;
+  lineWidth: number;
 }
 
 export class ScatterplotChunkCanvas extends React.PureComponent<
@@ -263,7 +244,7 @@ export class ScatterplotChunkCanvas extends React.PureComponent<
     ctx.scale(2, 2);
     ctx.clearRect(0, 0, this.props.width, this.props.height);
     const {
-      chunk,
+      points,
       color,
       opacity,
       timeStart,
@@ -271,21 +252,56 @@ export class ScatterplotChunkCanvas extends React.PureComponent<
       kX,
       kY,
       bX,
-      bY
+      bY,
+      radius,
+      lineWidth
     } = this.props;
-    ctx.fillStyle = color;
-    ctx.globalAlpha = opacity;
-    for (let i = 0; i < chunk[0].length; i++) {
-      if (chunk[0][i] >= timeStart && chunk[0][i] <= timeEnd) {
-        ctx.beginPath();
-        ctx.arc(
-          kX * chunk[1][i] + bX,
-          kY * chunk[2][i] + bY,
-          2,
-          0,
-          Math.PI * 2
-        );
-        ctx.fill();
+    const tx =
+      this.props.xTransform == "log"
+        ? (x: number) => Math.log(x)
+        : (x: number) => x;
+    const ty =
+      this.props.yTransform == "log"
+        ? (x: number) => Math.log(x)
+        : (x: number) => x;
+
+    if (this.props.showPoints) {
+      ctx.fillStyle = color;
+      ctx.globalAlpha = opacity;
+      for (let i = 0; i < points.t.length; i++) {
+        if (points.t[i] >= timeStart && points.t[i] <= timeEnd) {
+          const x = kX * tx(points[this.props.xVariable][i]) + bX;
+          const y = kY * ty(points[this.props.yVariable][i]) + bY;
+          if (isFinite(x) && isFinite(y)) {
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+    }
+    if (this.props.showLines) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.globalAlpha = opacity * 0.5;
+
+      let prev = null;
+      for (let i = 0; i < points.t.length; i++) {
+        if (points.t[i] >= timeStart && points.t[i] <= timeEnd) {
+          const now = [
+            kX * tx(points[this.props.xVariable][i]) + bX,
+            kY * ty(points[this.props.yVariable][i]) + bY
+          ];
+          if (isFinite(now[0]) && isFinite(now[1])) {
+            ctx.beginPath();
+            if (prev) {
+              ctx.moveTo(prev[0], prev[1]);
+              ctx.lineTo(now[0], now[1]);
+            }
+            prev = now;
+            ctx.stroke();
+          }
+        }
       }
     }
   }

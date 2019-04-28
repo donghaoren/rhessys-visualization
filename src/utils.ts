@@ -50,3 +50,7 @@ export function years_to_timestamp(year: number) {
 export function timestamp_to_string(ts: number) {
   return timeFormatter(new Date(timeOffset + ts * 1000));
 }
+
+export function deepEquals(a: any, b: any): boolean {
+  return JSON.stringify(a) == JSON.stringify(b);
+}

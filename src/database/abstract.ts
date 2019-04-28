@@ -16,6 +16,13 @@ export interface RHESSysDataFilter {
   };
 }
 
+export interface RHESSysDataGroups {
+  /** Group by these variables */
+  variables: string[];
+  /** For each group, give the values of the variables respectively */
+  groups: string[][];
+}
+
 export interface RHESSysVariable {
   name: string;
   type: "number" | "string";
@@ -23,36 +30,47 @@ export interface RHESSysVariable {
   unit: string;
 }
 
+export interface RHESSysStats {
+  count: number;
+  mean: number;
+  stdev: number;
+  min: number;
+  max: number;
+}
+
 export interface RHESSysDatabase {
-  /**
-   * Query the timeseries for a set of variables
-   * @param variables - A list of variables to query, optionally with /aggregation_function
-   */
-  queryTimeSeries(
+  /** Query data from the database */
+  queryVariables(
     table: string,
     granularity: RHESSysGranularity,
     variables: string[],
+    groups?: RHESSysDataGroups,
     filter?: RHESSysDataFilter
   ): Promise<
-    Array<{
-      /** The unix timestamp of the data item */
-      ts: number;
-      [name: string]: any;
-    }>
+    Array<
+      Array<{
+        /** The unix timestamp of the data item */
+        t: number;
+        [name: string]: any;
+      }>
+    >
   >;
 
-  queryScatterplot(
+  queryAggregatedVariables(
     table: string,
-    granularity: RHESSysGranularity,
-    variable1: string,
-    variable2: string,
+    variables: string[],
+    aggregation: RHESSysGranularity,
+    groups?: RHESSysDataGroups,
     filter?: RHESSysDataFilter
   ): Promise<
-    Array<{
-      ts: number;
-      x: number;
-      y: number;
-    }>
+    Array<
+      Array<{
+        t: number;
+        variables: {
+          [name: string]: RHESSysStats;
+        };
+      }>
+    >
   >;
 
   /** Query distinct values of a string variable */
@@ -63,7 +81,7 @@ export interface RHESSysDatabase {
     table: string,
     variable: string,
     granularity?: RHESSysGranularity
-  ): Promise<{ min: number; max: number; stdev: number; mean: number }>;
+  ): Promise<RHESSysStats>;
 
   /** Query tables */
   listTables(): Promise<string[]>;
