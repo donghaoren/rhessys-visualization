@@ -20,7 +20,9 @@ export enum DashboardActionType {
   AddVisualization = "AddVisualization",
   UpdateVisualization = "UpdateVisualization",
   MoveVisualizationUp = "MoveVisualizationUp",
-  MoveVisualizationDown = "MoveVisualizationDown"
+  MoveVisualizationDown = "MoveVisualizationDown",
+  MoveVisualizationToOverview = "MoveVisualizationToOverview",
+  MoveVisualizationToDetail = "MoveVisualizationToDetail"
 }
 
 export interface DashboardAction {

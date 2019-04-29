@@ -37,7 +37,7 @@ export class DashboardView extends React.Component<
 
   public handleResize = () => {
     this.setState({
-      visualizationWidth: this.container.getBoundingClientRect().width
+      visualizationWidth: this.container.getBoundingClientRect().width - 5
     });
   };
 

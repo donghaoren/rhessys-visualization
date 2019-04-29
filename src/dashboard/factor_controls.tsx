@@ -84,17 +84,6 @@ export class FactorControlsView extends React.Component<
           ))}
         </HTMLSelect>
         <span className="el-sep" />
-        <span className="el-label">Aggregate by</span>
-        <AggregationSelect
-          value={this.props.aggregation}
-          onChange={value => {
-            this.props.dispatch({
-              type: DashboardActionType.SetAggregation,
-              aggregation: value
-            });
-          }}
-        />
-        <span className="el-sep" />
         <Popover
           interactionKind={PopoverInteractionKind.CLICK}
           popoverClassName="bp3-popover-content-sizing"
@@ -125,6 +114,17 @@ export class FactorControlsView extends React.Component<
             ))}
           </div>
         </Popover>
+        <span className="el-sep" />
+        <span className="el-label">Aggregate by</span>
+        <AggregationSelect
+          value={this.props.aggregation}
+          onChange={value => {
+            this.props.dispatch({
+              type: DashboardActionType.SetAggregation,
+              aggregation: value
+            });
+          }}
+        />
       </span>
     );
   }

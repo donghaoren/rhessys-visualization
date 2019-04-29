@@ -206,6 +206,30 @@ export function reducer(
         }
       }
       break;
+    case DashboardActionType.MoveVisualizationToOverview:
+      {
+        for (let i = 0; i < newState.detailViews.length; i++) {
+          if (newState.detailViews[i].id == action.visualizationID) {
+            const vis = newState.detailViews[i];
+            newState.detailViews = arrayRemoveAt(newState.detailViews, i);
+            newState.overviewViews.push(vis);
+            break;
+          }
+        }
+      }
+      break;
+    case DashboardActionType.MoveVisualizationToDetail:
+      {
+        for (let i = 0; i < newState.overviewViews.length; i++) {
+          if (newState.overviewViews[i].id == action.visualizationID) {
+            const vis = newState.overviewViews[i];
+            newState.overviewViews = arrayRemoveAt(newState.overviewViews, i);
+            newState.detailViews.push(vis);
+            break;
+          }
+        }
+      }
+      break;
   }
   return newState;
 }

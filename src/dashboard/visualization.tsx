@@ -7,6 +7,7 @@ import {
   Slider
 } from "@blueprintjs/core";
 import * as React from "react";
+import * as d3 from "d3";
 import { connect } from "react-redux";
 import { RHESSysDataFilter } from "../database/abstract";
 import { AggregatedTimeseries } from "../visualizations/aggregated_timeseries";
@@ -93,14 +94,51 @@ export class VisualizationView extends React.Component<
   VisualizationViewProps,
   {}
 > {
-  public refTimeseries: TimeseriesPlot;
-  public refScatterplot: Scatterplot;
+  public plotRefs = new Map<string, TimeseriesPlot | Scatterplot>();
+  public fplotRefs = (level: string, e: TimeseriesPlot | Scatterplot) => {
+    if (e) {
+      this.plotRefs.set(level, e);
+    } else {
+      this.plotRefs.delete(level);
+    }
+  };
 
   public renderToolbar() {
+    const canUp =
+      this.props.role == "overview"
+        ? this.props.overviewViews.indexOf(this.props.visualization) != 0
+        : this.props.detailViews.indexOf(this.props.visualization) != 0;
+    const canDown =
+      this.props.role == "overview"
+        ? this.props.overviewViews.indexOf(this.props.visualization) !=
+          this.props.overviewViews.length - 1
+        : this.props.detailViews.indexOf(this.props.visualization) !=
+          this.props.detailViews.length - 1;
     return (
       <div className="dashboard-visualization-header">
         <div className="el-row">
           <div className="el-right">
+            <Button
+              icon={
+                this.props.role == "overview"
+                  ? "circle-arrow-down"
+                  : "circle-arrow-up"
+              }
+              text={
+                this.props.role == "overview"
+                  ? "Move to Detail"
+                  : "Move to Overview"
+              }
+              onClick={() => {
+                this.props.dispatch({
+                  type:
+                    this.props.role == "overview"
+                      ? DashboardActionType.MoveVisualizationToDetail
+                      : DashboardActionType.MoveVisualizationToOverview,
+                  visualizationID: this.props.visualization.id
+                });
+              }}
+            />{" "}
             <Button
               icon="arrow-up"
               onClick={() => {
@@ -109,6 +147,7 @@ export class VisualizationView extends React.Component<
                   visualizationID: this.props.visualization.id
                 });
               }}
+              disabled={!canUp}
             />{" "}
             <Button
               icon="arrow-down"
@@ -118,6 +157,7 @@ export class VisualizationView extends React.Component<
                   visualizationID: this.props.visualization.id
                 });
               }}
+              disabled={!canDown}
             />{" "}
             <Button
               icon="trash"
@@ -179,7 +219,7 @@ export class VisualizationView extends React.Component<
       case "scatterplot": {
         return (
           <Scatterplot
-            ref={e => (this.refScatterplot = e)}
+            ref={this.fplotRefs.bind(this, facetLevel || "__all__")}
             key={facetLevel || "__all__"}
             {...commonProps}
             width={
@@ -210,7 +250,7 @@ export class VisualizationView extends React.Component<
         return (
           <TimeseriesPlot
             key={facetLevel || "__all__"}
-            ref={e => (this.refTimeseries = e)}
+            ref={this.fplotRefs.bind(this, facetLevel || "__all__")}
             {...commonProps}
             {...(this.props.role == "overview"
               ? {
@@ -300,7 +340,7 @@ export class VisualizationView extends React.Component<
               variable={this.props.visualization.yVariable}
               scale={this.props.visualization.yScale}
               height={this.props.visualization.height}
-              title={"Aggregate by " + this.props.aggregation}
+              title={"Aggregate by " + this.props.aggregation + " of year"}
               groups={this.props.groups.map(x => ({
                 opacity: 0.6,
                 lineWidth: 1,
@@ -313,21 +353,52 @@ export class VisualizationView extends React.Component<
     }
   }
 
+  public handleAutoScale = () => {
+    const xStats = [];
+    const yStats = [];
+    for (const plot of this.plotRefs.values()) {
+      if (plot instanceof Scatterplot) {
+        const [xStat, yStat] = plot.getCurrentViewStats();
+        xStats.push(xStat);
+        yStats.push(yStat);
+      }
+      if (plot instanceof TimeseriesPlot) {
+        const yStat = plot.getCurrentViewStats();
+        yStats.push(yStat);
+      }
+    }
+    const mergeStats = (
+      stats: Array<{
+        min: number;
+        max: number;
+        stdev: number;
+        mean: number;
+      }>
+    ) => {
+      return {
+        min: Math.min(...stats.map(x => x.min)),
+        max: Math.max(...stats.map(x => x.max)),
+        stdev: d3.mean(stats.map(x => x.stdev)),
+        mean: d3.mean(stats.map(x => x.mean))
+      };
+    };
+    const update: Partial<VisualizationDescription> = {};
+    if (xStats.length > 0) {
+      update.xScale = autoScaleConservative(mergeStats(xStats));
+    }
+    if (yStats.length > 0) {
+      update.yScale = autoScaleConservative(mergeStats(yStats));
+    }
+    this.dispatchUpdate(update);
+  };
+
   public renderSmallControls() {
     const vis = this.props.visualization;
     switch (vis.type) {
       case "timeseries": {
         return (
           <span className="el-small-controls">
-            <Button
-              text="Auto Scale"
-              onClick={() => {
-                const stat = this.refTimeseries.getCurrentViewStats();
-                this.dispatchUpdate({
-                  yScale: autoScaleConservative(stat)
-                });
-              }}
-            />
+            <Button text="Auto Scale" onClick={this.handleAutoScale} />
             <span className="el-sep" />
             <Popover
               interactionKind={PopoverInteractionKind.CLICK}
@@ -386,16 +457,7 @@ export class VisualizationView extends React.Component<
       case "scatterplot": {
         return (
           <span className="el-small-controls">
-            <Button
-              text="Auto Scale"
-              onClick={() => {
-                const stat = this.refScatterplot.getCurrentViewStats();
-                this.dispatchUpdate({
-                  xScale: autoScaleConservative(stat[0]),
-                  yScale: autoScaleConservative(stat[1])
-                });
-              }}
-            />
+            <Button text="Auto Scale" onClick={this.handleAutoScale} />
             <span className="el-sep" />
             <Popover
               interactionKind={PopoverInteractionKind.CLICK}
@@ -665,6 +727,10 @@ export class AddVisualizationView extends React.Component<
                             this.state.yVariable
                           )
                         );
+                        this.setState({
+                          xVariable: null,
+                          yVariable: null
+                        });
                       }
                     }}
                   />
