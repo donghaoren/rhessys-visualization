@@ -59,7 +59,9 @@ export class FactorControlsView extends React.Component<
             <span className="group-editor-group" key={index}>
               <span className="el-color" style={{ backgroundColor: g.color }} />
               <span className="el-filter">
-                {this.props.groupsBy.join(",")} = {g.values.join(",")}
+                {this.props.groupsBy.length > 0
+                  ? `${this.props.groupsBy.join(",")} = ${g.values.join(",")}`
+                  : ""}
               </span>
             </span>
           ))}

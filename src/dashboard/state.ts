@@ -19,6 +19,9 @@ export interface PaletteDescription {
 export interface DashboardConfig {
   factors: FactorDescription[];
   palettes: PaletteDescription[];
+  timeStart: string;
+  timeEnd: string;
+  defaultVariable?: string;
 }
 
 export interface VisualizationDescription {
@@ -120,6 +123,12 @@ export function groupsFromFactor(
   palettes: PaletteDescription[],
   factor: FactorDescription
 ) {
+  if (!factor) {
+    return {
+      groupsBy: [],
+      groups: [{ values: [], color: "#000000" }]
+    };
+  }
   const colors = getFactorColors(palettes, factor);
   return {
     groupsBy: [factor.name],
@@ -196,11 +205,13 @@ export async function createDefaultDashboardState(
     db,
     table,
     variableList: await db.listVariables(table),
-    timeStart: parseTime("1970-01-01"),
-    timeEnd: parseTime("2020-01-01"),
-    overviewViews: [await createDefaultTimeseries(db, table, "gpsn")],
+    timeStart: parseTime(config.timeStart),
+    timeEnd: parseTime(config.timeEnd),
+    overviewViews: config.defaultVariable
+      ? [await createDefaultTimeseries(db, table, config.defaultVariable)]
+      : [],
     overviewGranularity: "month",
-    detailViews: [await createDefaultTimeseries(db, table, "gpsn")],
+    detailViews: [],
     detailGranularity: "day",
     detailTimeStart: parseTime("2000-01-01"),
     detailTimeEnd: parseTime("2005-01-01"),
